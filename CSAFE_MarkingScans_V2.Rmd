@@ -1,0 +1,313 @@
+---
+title: "CSAFE_MarkingScans_V2"
+author: "Andrew Maloney"
+date: "10/7/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+
+library(tidyverse)
+library(x3ptools)
+library(bulletxtrctr)
+library(ggplot2)
+library(keras)
+library(purrr)
+library(svMisc)
+
+```
+
+```{r eval=FALSE, include=FALSE}
+
+data_dir <- "/media/Raven/Masks/Completed/LAPD"
+
+
+df <- tibble(path = list.files(path = file.path(data_dir, "Megan"), 
+                               pattern = ".x3p", recursive = T, 
+                               full.names = T)) %>% mutate(x3p = map(path, read_x3p))
+
+
+
+```
+
+```{r}
+
+
+f = function(x, n){
+    x - 128*(1:n)
+  
+}
+
+
+for(i in 1:nrow(df_1)){
+  
+  progress(i, progress.bar = TRUE)
+  Sys.sleep(0.01)
+  dimension_x <- dim(df_1$x3p[[i]]$surface.matrix)[1]
+  dimension_y <- dim(df_1$x3p[[i]]$surface.matrix)[2]
+  
+  division_x <- dim(df_1$x3p[[i]]$surface.matrix)[1] / 128
+  division_y <- dim(df_1$x3p[[i]]$surface.matrix)[2] / 128
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0)
+  grid_lengths_y <- c(f(dimension_y, division_y), 0)
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y)
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df_1$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df_1$x3p[[i]],
+                               width = 128,
+                               height = 128)
+  
+}
+
+
+
+```
+
+```{r}
+
+
+for(i in 1:nrow(df_2)){
+  
+  progress(i, progress.bar = TRUE)
+  Sys.sleep(0.01)
+  dimension_x <- dim(df_2$x3p[[i]]$surface.matrix)[1]
+  dimension_y <- dim(df_2$x3p[[i]]$surface.matrix)[2]
+  
+  division_x <- dim(df_2$x3p[[i]]$surface.matrix)[1] / 128
+  division_y <- dim(df_2$x3p[[i]]$surface.matrix)[2] / 128
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0)
+  grid_lengths_y <- c(f(dimension_y, division_y), 0)
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y)
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df_2$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df_2$x3p[[i]],
+                               width = 128,
+                               height = 128)
+  
+}
+
+
+
+
+
+```
+
+```{r}
+
+
+
+for(i in 1:nrow(df_3)){
+  
+  progress(i, progress.bar = TRUE)
+  Sys.sleep(0.01)
+  dimension_x <- dim(df_3$x3p[[i]]$surface.matrix)[1]
+  dimension_y <- dim(df_3$x3p[[i]]$surface.matrix)[2]
+  
+  division_x <- dim(df_3$x3p[[i]]$surface.matrix)[1] / 128
+  division_y <- dim(df_3$x3p[[i]]$surface.matrix)[2] / 128
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0)
+  grid_lengths_y <- c(f(dimension_y, division_y), 0)
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y)
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df_3$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df_3$x3p[[i]],
+                               width = 128,
+                               height = 128)
+  
+}
+
+
+
+```
+
+```{r}
+
+
+
+for(i in 1:nrow(df_4)){
+  
+  progress(i, progress.bar = TRUE)
+  Sys.sleep(0.01)
+  dimension_x <- dim(df_4$x3p[[i]]$surface.matrix)[1]
+  dimension_y <- dim(df_4$x3p[[i]]$surface.matrix)[2]
+  
+  division_x <- dim(df_4$x3p[[i]]$surface.matrix)[1] / 128
+  division_y <- dim(df_4$x3p[[i]]$surface.matrix)[2] / 128
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0)
+  grid_lengths_y <- c(f(dimension_y, division_y), 0)
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y)
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df_4$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df_4$x3p[[i]],
+                               width = 128,
+                               height = 128)
+  
+}
+
+
+
+
+```
+
+```{r}
+
+for(i in 1:nrow(df_5)){
+  
+  progress(i, progress.bar = TRUE)
+  Sys.sleep(0.01)
+  dimension_x <- dim(df_5$x3p[[i]]$surface.matrix)[1]
+  dimension_y <- dim(df_5$x3p[[i]]$surface.matrix)[2]
+  
+  division_x <- dim(df_5$x3p[[i]]$surface.matrix)[1] / 128
+  division_y <- dim(df_5$x3p[[i]]$surface.matrix)[2] / 128
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0)
+  grid_lengths_y <- c(f(dimension_y, division_y), 0)
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y)
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df_5$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df_5$x3p[[i]],
+                               width = 128,
+                               height = 128)
+  
+}
+
+
+
+```
+
+
+
+```{r}
+
+df_1 <- unnest(df_1, chop_storage)
+
+for(i in 1:nrow(df_1)){
+  
+  df_1$labels[[i]] <- unique(pluck(df_1$chop_storage[[i]], 6)) 
+  
+}
+
+df_1 <- df_1 %>% chop(c(chop_storage, labels))
+
+#saveRDS(df_1, file="LAPD_Chopped_data_1.Rda")
+```
+
+```{r}
+
+
+df_2 <- unnest(df_2, chop_storage)
+
+for(i in 1:nrow(df_2)){
+  
+  df_2$labels[[i]] <- unique(pluck(df_2$chop_storage[[i]], 6)) 
+  
+}
+
+df_2 <- df_2 %>% chop(c(chop_storage, labels))
+
+#saveRDS(df_2, file="LAPD_Chopped_data_2.Rda")
+
+
+```
+
+```{r}
+
+df_3 <- unnest(df_3, chop_storage)
+
+for(i in 1:nrow(df_3)){
+  
+  df_3$labels[[i]] <- unique(pluck(df_3$chop_storage[[i]], 6)) 
+  
+}
+
+df_3 <- df_3 %>% chop(c(chop_storage, labels))
+
+#saveRDS(df_3, file="LAPD_Chopped_data_3.Rda")
+
+```
+
+```{r}
+
+
+df_4 <- unnest(df_4, chop_storage)
+
+for(i in 1:nrow(df_4)){
+  
+  df_4$labels[[i]] <- unique(pluck(df_4$chop_storage[[i]], 6)) 
+  
+}
+
+df_4 <- df_4 %>% chop(c(chop_storage, labels))
+
+#saveRDS(df_4, file="LAPD_Chopped_data_4.Rda")
+
+
+```
+
+```{r}
+
+
+
+
+df_5 <- unnest(df_5, chop_storage)
+
+for(i in 1:nrow(df_5)){
+  
+  df_5$labels[[i]] <- unique(pluck(df_5$chop_storage[[i]], 6)) 
+  
+}
+
+df_5 <- df_5 %>% chop(c(chop_storage, labels))
+
+
+
+
+#saveRDS(df_5, file="LAPD_Chopped_data_5.Rda")
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
