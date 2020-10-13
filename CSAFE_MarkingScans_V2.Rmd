@@ -259,7 +259,6 @@ df_3 <- df_3 %>% chop(c(chop_storage, labels))
 
 ```{r}
 
-
 df_4 <- unnest(df_4, chop_storage)
 
 for(i in 1:nrow(df_4)){
@@ -272,13 +271,9 @@ df_4 <- df_4 %>% chop(c(chop_storage, labels))
 
 #saveRDS(df_4, file="LAPD_Chopped_data_4.Rda")
 
-
 ```
 
 ```{r}
-
-
-
 
 df_5 <- unnest(df_5, chop_storage)
 
@@ -291,15 +286,132 @@ for(i in 1:nrow(df_5)){
 df_5 <- df_5 %>% chop(c(chop_storage, labels))
 
 
-
-
 #saveRDS(df_5, file="LAPD_Chopped_data_5.Rda")
+
+
+```
+
+```{r}
+
+df_1 <- readRDS("LAPD_Chopped_data_1.Rda")
+
+```
+
+
+```{r}
+df_1_0 <- df_1[1:10,]
+df_1_1 <- df_1[11:20, ]
+df_1_2 <- df_1[21:30, ]
+df_1_3 <- df_1[31:40, ]
+df_1_4 <- df_1[41:50, ]
+df_1_5 <- df_1[51:60, ]
+df_1_6 <- df_1[61:70, ]
+df_1_7 <- df_1[71:80, ]
+df_1_8 <- df_1[81:90, ]
+df_1_9 <- df_1[91:100, ]
+```
+
+
+
+```{r}
+
+df_1_0 <- df_1_0 %>% unnest(c(chop_storage, labels))
+
+df_1_0 <- unnest(df_1_0, cols = labels)
+
+
+array_1_0 = list()
+
+for(i in 1:nrow(df_1_0)){
+  
+  array_1_0[[i]] <- array(c(df_1_0$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_0 <- do.call(abind, c(array_1_0, along = 0))
+
+dim(array_1_0)
+```
+
+```{r}
+df_1_1 <- df_1_1 %>% unnest(c(chop_storage, labels))
+
+df_1_1 <- unnest(df_1_1, cols = labels)
+
+array_1_1 = list()
+
+for(i in 1:nrow(df_1_1)){
+  
+  array_1_1[[i]] <- array(c(df_1_1$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_1 <- do.call(abind, c(array_1_1, along = 0))
+
+dim(array_1_1)
+
+
+```
+
+
+```{r}
+df_1_2 <- df_1_2 %>% unnest(c(chop_storage, labels))
+
+df_1_2 <- unnest(df_1_2, cols = labels)
+
+array_1_2 = list()
+
+for(i in 1:nrow(df_1_2)){
+  
+  array_1_2[[i]] <- array(c(df_1_2$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_2 <- do.call(abind, c(array_1_2, along = 0))
+
+dim(array_1_2)
+
+
+```
+
+```{r}
+
+df_1_3 <- df_1_3 %>% unnest(c(chop_storage, labels))
+
+df_1_3 <- unnest(df_1_3, cols = labels)
+
+array_1_3 = list()
+
+for(i in 1:nrow(df_1_3)){
+  
+  array_1_3[[i]] <- array(c(df_1_3$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_3 <- do.call(abind, c(array_1_3, along = 0))
+
+dim(array_1_3)
+
+
+
+
 
 
 
 
 ```
-
 
 
 
