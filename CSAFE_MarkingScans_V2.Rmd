@@ -70,6 +70,10 @@ for(i in 1:nrow(df_1)){
   
 }
 
+#Calculate the number of cropped images we are able to extract based on marking scan resolution
+#1. Find x and y dimensions of x3p scan
+#2. Calculate all x and y locations for cropping, location represents the bottom right of a crop
+#3. Store each cropped image in a list of lists
 
 
 ```
@@ -103,7 +107,10 @@ for(i in 1:nrow(df_2)){
 }
 
 
-
+#Calculate the number of cropped images we are able to extract based on marking scan resolution
+#1. Find x and y dimensions of x3p scan
+#2. Calculate all x and y locations for cropping, location represents the bottom right of a crop
+#3. Store each cropped image in a list of lists
 
 
 ```
@@ -137,7 +144,10 @@ for(i in 1:nrow(df_3)){
   
 }
 
-
+#Calculate the number of cropped images we are able to extract based on marking scan resolution
+#1. Find x and y dimensions of x3p scan
+#2. Calculate all x and y locations for cropping, location represents the bottom right of a crop
+#3. Store each cropped image in a list of lists
 
 ```
 
@@ -171,7 +181,10 @@ for(i in 1:nrow(df_4)){
 }
 
 
-
+#Calculate the number of cropped images we are able to extract based on marking scan resolution
+#1. Find x and y dimensions of x3p scan
+#2. Calculate all x and y locations for cropping, location represents the bottom right of a crop
+#3. Store each cropped image in a list of lists
 
 ```
 
@@ -202,7 +215,10 @@ for(i in 1:nrow(df_5)){
   
 }
 
-
+#Calculate the number of cropped images we are able to extract based on marking scan resolution
+#1. Find x and y dimensions of x3p scan
+#2. Calculate all x and y locations for cropping, location represents the bottom right of a crop
+#3. Store each cropped image in a list of lists
 
 ```
 
@@ -220,6 +236,10 @@ for(i in 1:nrow(df_1)){
 
 df_1 <- df_1 %>% chop(c(chop_storage, labels))
 
+#Extract the annotations for each cropped image. 
+#1. Pluck can work with lists of lists, the 6 represents the location of the annotations.
+#2. Store as a list of lists
+
 #saveRDS(df_1, file="LAPD_Chopped_data_1.Rda")
 ```
 
@@ -235,6 +255,10 @@ for(i in 1:nrow(df_2)){
 }
 
 df_2 <- df_2 %>% chop(c(chop_storage, labels))
+
+#Extract the annotations for each cropped image. 
+#1. Pluck can work with lists of lists, the 6 represents the location of the annotations.
+#2. Store as a list of lists
 
 #saveRDS(df_2, file="LAPD_Chopped_data_2.Rda")
 
@@ -253,6 +277,10 @@ for(i in 1:nrow(df_3)){
 
 df_3 <- df_3 %>% chop(c(chop_storage, labels))
 
+#Extract the annotations for each cropped image. 
+#1. Pluck can work with lists of lists, the 6 represents the location of the annotations.
+#2. Store as a list of lists
+
 #saveRDS(df_3, file="LAPD_Chopped_data_3.Rda")
 
 ```
@@ -269,6 +297,10 @@ for(i in 1:nrow(df_4)){
 
 df_4 <- df_4 %>% chop(c(chop_storage, labels))
 
+#Extract the annotations for each cropped image. 
+#1. Pluck can work with lists of lists, the 6 represents the location of the annotations.
+#2. Store as a list of lists
+
 #saveRDS(df_4, file="LAPD_Chopped_data_4.Rda")
 
 ```
@@ -284,6 +316,10 @@ for(i in 1:nrow(df_5)){
 }
 
 df_5 <- df_5 %>% chop(c(chop_storage, labels))
+
+#Extract the annotations for each cropped image. 
+#1. Pluck can work with lists of lists, the 6 represents the location of the annotations.
+#2. Store as a list of lists
 
 
 #saveRDS(df_5, file="LAPD_Chopped_data_5.Rda")
@@ -309,15 +345,19 @@ df_1_6 <- df_1[61:70, ]
 df_1_7 <- df_1[71:80, ]
 df_1_8 <- df_1[81:90, ]
 df_1_9 <- df_1[91:100, ]
+
+#Process data in small batches... because R likes to use all our memories
 ```
 
 
 
 ```{r}
 
-df_1_0 <- df_1_0 %>% unnest(c(chop_storage, labels))
+df_1_0 <- df_1_0 %>% unnest(c(chop_storage, labels)) #Unlist
 
-df_1_0 <- unnest(df_1_0, cols = labels)
+df_1_0 <- unnest(df_1_0, cols = labels) #Unlist to obtain unique annotations for each cropped scan.
+
+#This will result in duplicate scans because some scans have 1,2,3,4,5... annotations depending on the crop.
 
 
 array_1_0 = list()
@@ -601,7 +641,10 @@ dim(array_1_9)
 #input_shape <- c(3525, 128, 128, 1)
 
 model_1 <- keras_model_sequential() %>%
-  layer_conv_3d(filters = 32, kernel_size = c(3, 3, 3), padding = "same", activation = "relu", input_shape = c(128, 128, 1)) %>%
+  layer_conv_3d(filters = 32, kernel_size = c(3, 3, 3), padding = "same", activation = "relu", input_shape = c(128, 128, 1)) %>% 
+  
+  #Issue (Samples hidden, ConvDim1, ConvDim2, ConvDim3?, Channels = 1 )
+  
   layer_max_pooling_3d(pool_size = c(2, 2, 2)) %>%
   layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), activation = "relu") %>%
   layer_max_pooling_3d(pool_size = c(2, 2, 1)) %>%
