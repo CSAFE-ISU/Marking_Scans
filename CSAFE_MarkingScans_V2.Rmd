@@ -325,7 +325,7 @@ array_1_0 = list()
 for(i in 1:nrow(df_1_0)){
   
   array_1_0[[i]] <- array(c(df_1_0$chop_storage[[i]]$surface.matrix),
-                     dim = c(128, 128, 1))
+                     dim = c(128, 128, 1, 1))
   
 
 }
@@ -567,7 +567,6 @@ dim(array_1_8)
 
 ```
 
-
 ```{r}
 df_1_9 <- df_1_9 %>% unnest(c(chop_storage, labels))
 
@@ -596,8 +595,41 @@ dim(array_1_9)
 
 ```
 
+```{r}
 
 
+#input_shape <- c(3525, 128, 128, 1)
+
+model_1 <- keras_model_sequential() %>%
+  layer_conv_3d(filters = 32, kernel_size = c(3, 3, 3), padding = "same", activation = "relu", input_shape = c(128, 128, 1)) %>%
+  layer_max_pooling_3d(pool_size = c(2, 2, 2)) %>%
+  layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), activation = "relu") %>%
+  layer_max_pooling_3d(pool_size = c(2, 2, 1)) %>%
+  layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), activation = "relu") %>%
+  layer_max_pooling_3d(pool_size = c(2,2,1)) %>%
+  layer_conv_3d(filters = 64, kernel_size = c(3,3,1), activation = "relu") %>%
+  layer_max_pooling_3d(pool_size = c(2, 2, 1)) %>%
+  layer_flatten() %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dense(units = 7, activation = "softmax")
+  
+model_1
+```
+
+```{r}
+model_1 %>% compile(
+  optimizer = "rmsprop",
+  loss = "categorical_crossentropy",
+  metrics = c("accuracy")
+)
+model_1 %>% fit(
+  array_1_0, y_1_0, epochs = 5, batch_size = 100
+)
+
+#reshapeData <- X_train.re
+
+#dim(array_1_0)
+```
 
 
 
