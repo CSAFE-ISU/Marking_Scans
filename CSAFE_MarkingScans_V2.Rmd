@@ -273,7 +273,7 @@ df_4 <- df_4 %>% chop(c(chop_storage, labels))
 
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 df_5 <- unnest(df_5, chop_storage)
 
@@ -333,6 +333,10 @@ for(i in 1:nrow(df_1_0)){
 
 array_1_0 <- do.call(abind, c(array_1_0, along = 0))
 
+y_1_0 <- df_1_0$labels
+
+save(array_1_0, y_1_0, file = "train_1_0.RData")
+
 dim(array_1_0)
 ```
 
@@ -353,6 +357,11 @@ for(i in 1:nrow(df_1_1)){
 
 
 array_1_1 <- do.call(abind, c(array_1_1, along = 0))
+
+y_1_1 <- df_1_1$labels
+
+
+save(array_1_1, y_1_1, file = "train_1_1.RData")
 
 dim(array_1_1)
 
@@ -378,6 +387,10 @@ for(i in 1:nrow(df_1_2)){
 
 array_1_2 <- do.call(abind, c(array_1_2, along = 0))
 
+y_1_2 <- df_1_2$labels
+
+save(array_1_2, y_1_2, file = "train_1_2.RData")
+
 dim(array_1_2)
 
 
@@ -402,20 +415,186 @@ for(i in 1:nrow(df_1_3)){
 
 array_1_3 <- do.call(abind, c(array_1_3, along = 0))
 
+y_1_3 <- df_1_3$labels
+
+
+save(array_1_3, y_1_3, file = "train_1_3.RData")
+
 dim(array_1_3)
-
-
-
-
-
 
 
 
 ```
 
+```{r}
 
 
 
+
+df_1_4 <- df_1_4 %>% unnest(c(chop_storage, labels))
+
+df_1_4 <- unnest(df_1_4, cols = labels)
+
+array_1_4 = list()
+
+for(i in 1:nrow(df_1_4)){
+  
+  array_1_4[[i]] <- array(c(df_1_4$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_4 <- do.call(abind, c(array_1_4, along = 0))
+
+y_1_4 <- df_1_4$labels
+
+save(array_1_4, y_1_4, file = "train_1_4.RData")
+
+dim(array_1_4)
+
+
+
+```
+
+```{r}
+
+
+df_1_5 <- df_1_5 %>% unnest(c(chop_storage, labels))
+
+df_1_5 <- unnest(df_1_5, cols = labels)
+
+array_1_5 = list()
+
+for(i in 1:nrow(df_1_5)){
+  
+  array_1_5[[i]] <- array(c(df_1_5$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_5 <- do.call(abind, c(array_1_5, along = 0))
+
+y_1_5 <- df_1_5$labels
+
+save(array_1_5, y_1_5, file = "train_1_5.RData")
+
+dim(array_1_5)
+
+
+```
+
+```{r}
+df_1_6 <- df_1_6 %>% unnest(c(chop_storage, labels))
+
+df_1_6 <- unnest(df_1_6, cols = labels)
+
+array_1_6 = list()
+
+for(i in 1:nrow(df_1_6)){
+  
+  array_1_6[[i]] <- array(c(df_1_6$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_6 <- do.call(abind, c(array_1_6, along = 0))
+
+y_1_6 <- df_1_6$labels
+
+save(array_1_6, y_1_6, file = "train_1_6.RData")
+
+dim(array_1_6)
+
+```
+
+
+```{r}
+df_1_7 <- df_1_7 %>% unnest(c(chop_storage, labels))
+
+df_1_7 <- unnest(df_1_7, cols = labels)
+
+array_1_7 = list()
+
+for(i in 1:nrow(df_1_7)){
+  
+  array_1_7[[i]] <- array(c(df_1_7$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_7 <- do.call(abind, c(array_1_7, along = 0))
+
+y_1_7 <- df_1_7$labels
+
+save(array_1_7, y_1_7, file = "train_1_7.RData")
+
+dim(array_1_7)
+
+```
+
+```{r}
+df_1_8 <- df_1_8 %>% unnest(c(chop_storage, labels))
+
+df_1_8 <- unnest(df_1_8, cols = labels)
+
+array_1_8 = list()
+
+for(i in 1:nrow(df_1_8)){
+  
+  array_1_8[[i]] <- array(c(df_1_8$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_8 <- do.call(abind, c(array_1_8, along = 0))
+
+y_1_8 <- df_1_8$labels
+
+save(array_1_8, y_1_8, file = "train_1_8.RData")
+
+dim(array_1_8)
+
+
+```
+
+
+```{r}
+df_1_9 <- df_1_9 %>% unnest(c(chop_storage, labels))
+
+df_1_9 <- unnest(df_1_9, cols = labels)
+
+array_1_9 = list()
+
+for(i in 1:nrow(df_1_9)){
+  
+  array_1_9[[i]] <- array(c(df_1_9$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1))
+  
+
+}
+
+
+array_1_9 <- do.call(abind, c(array_1_9, along = 0))
+
+y_1_9 <- df_1_9$labels
+
+
+save(array_1_9, y_1_9, file = "train_1_9.RData")
+
+dim(array_1_9)
+
+
+```
 
 
 
