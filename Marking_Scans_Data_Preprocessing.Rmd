@@ -27,23 +27,24 @@ library(tensorflow)
 
 ```
 
+
 ```{r}
 
+data_dir <- "/media/Raven/Masks/Completed/LAPD"
 
 
-df_1 <- readRDS("LAPD_Chopped_data_1.Rda")
-
-df_1 <- df_1 %>% select(-chop_storage)
-
-
+df <- tibble(path = list.files(path = file.path(data_dir, "Megan"), 
+                               pattern = ".x3p", recursive = T, 
+                               full.names = T)) %>% mutate(x3p = map(path, read_x3p))
+#Take first 100 x3p files
+df_1 <- df[1:100,]
 ```
 
 
 ```{r}
-#Take first 100 x3p files
-df_2 <- df_1
 
-head(df_1)
+df_2 <- df_1 # For 256x256 processing
+
 ```
 
 ```{r}
