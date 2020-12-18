@@ -101,24 +101,31 @@ for(i in 1:nrow(df_2)){
 
 for(i in 1:nrow(df_1)){
   
-  pad_surf <- rbind(0, cbind(0, df_1$x3p[[i]]$surface.matrix, 0), 0) #Create temporary padded surface.matrix so window does not go out of bounds.
-                                                                   #Using zeros as padding does not affect the calculations
-  for(j in 1:nrow(df_1$x3p[[i]]$surface.matrix)){           
+  pad_surf <- rbind(0, cbind(0, df$x3p[[i]]$surface.matrix, 0), 0)
+  #
+  
+  for(j in 1:nrow(df_1$x3p[[i]]$surface.matrix)){
     for(k in 1:ncol(df_1$x3p[[i]]$surface.matrix)){
       
-      if(is.na(pad_surf[j,k]) & #Find NA values
+      if(is.na(pad_surf[j,k]) &
        #all(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]) %in% pad_surf) &
-       any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){ #Check if neighbor elements are NA or Not
+       any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){
         
         
-        pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE) #Replace missing element's with average of missing element's neighbors
+        pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE)
         
-       } else{pad_surf[j,k]} #If not NA do nothing
+        
+       } 
       
     }
-  }
+  } 
   
-  df_1$x3p[[i]]$surface.matrix <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))] #Remove temporary zero padding and re-store the new surface.matrix
+  pad_surfx <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))]
+  
+  pad_surfx[, ncol(pad_surfx) ] <- pad_surfx[, ncol(pad_surfx) - 1]
+  pad_surfx[nrow(pad_surfx), ] <- pad_surfx[nrow(pad_surfx)-1, ]
+  
+  df_1$x3p[[i]]$surface.matrix <- pad_surfx
 }
 
 
@@ -134,27 +141,32 @@ for(i in 1:nrow(df_1)){
 
 for(i in 1:nrow(df_2)){
   
-  pad_surf <- rbind(0, cbind(0, df_2$x3p[[i]]$surface.matrix, 0), 0) #Create temporary padded surface.matrix so window does not go out of bounds.
-                                                                   #Using zeros as padding does not affect the calculations
-  for(j in 1:nrow(df_2$x3p[[i]]$surface.matrix)){           
+  pad_surf <- rbind(0, cbind(0, df$x3p[[i]]$surface.matrix, 0), 0)
+  #
+  
+  for(j in 1:nrow(df_2$x3p[[i]]$surface.matrix)){
     for(k in 1:ncol(df_2$x3p[[i]]$surface.matrix)){
       
-      if(is.na(pad_surf[j,k]) & #Find NA values
+      if(is.na(pad_surf[j,k]) &
        #all(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]) %in% pad_surf) &
-       any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){ #Check if neighbor elements are NA or Not
+       any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){
         
         
-        pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE) #Replace missing element's with average of missing element's neighbors
+        pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE)
         
-       } else{pad_surf[j,k]} #If not NA do nothing
+        
+       } 
       
     }
-  }
+  } 
   
-  df_2$x3p[[i]]$surface.matrix <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))] #Remove temporary zero padding and re-store the new surface.matrix
+  pad_surfx <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))]
+  
+  pad_surfx[, ncol(pad_surfx) ] <- pad_surfx[, ncol(pad_surfx) - 1]
+  pad_surfx[nrow(pad_surfx), ] <- pad_surfx[nrow(pad_surfx)-1, ]
+  
+  df_2$x3p[[i]]$surface.matrix <- pad_surfx
 }
-
-
 
 
 ```
