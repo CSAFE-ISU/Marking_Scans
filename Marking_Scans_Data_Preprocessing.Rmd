@@ -77,8 +77,11 @@ for(i in 1:nrow(df_1)){
   
   df_1$x3pmin[[i]] <- min(df_1$x3p[[i]]$surface.matrix, na.rm = TRUE)
   df_1$x3pmax[[i]] <- max(df_1$x3p[[i]]$surface.matrix, na.rm = TRUE)
+  #df_1$x3p[[i]]$surface.matrix <- (df_1$x3p[[i]]$surface.matrix - df_1$x3pmin[[i]])/(df_1$x3pmax[[i]] - df_1$x3pmin[[i]])*255
   
 }
+
+# Commented Out line is for if the user chooses to rescale the values to [0,255]
 
 
 ```
@@ -89,6 +92,7 @@ for(i in 1:nrow(df_2)){
   
   df_2$x3pmin[[i]] <- min(df_2$x3p[[i]]$surface.matrix, na.rm = TRUE)
   df_2$x3pmax[[i]] <- max(df_2$x3p[[i]]$surface.matrix, na.rm = TRUE)
+  #df_2$x3p[[i]]$surface.matrix <- (df_2$x3p[[i]]$surface.matrix - df_2$x3pmin[[i]])/(df_2$x3pmax[[i]] - df_2$x3pmin[[i]])*255
   
 }
 
@@ -101,7 +105,7 @@ for(i in 1:nrow(df_2)){
 for(i in 1:nrow(df_1)){
   df_1$x3p[[i]] <- x3p_add_annotation(df_1$x3p[[i]], color = "#000000FF", annotation = "Missing Value") #Create new annotation and corresponding color code for Missing Values
   df_1$x3p[[i]]$mask <- t(df_1$x3p[[i]]$mask)                                                           #Transpose mask so dimensions correspond to surface.matrix dimensions
-  df_1$x3p[[i]]$mask[which(is.na(df_1$x3p[[i]]$surface.matrix))] <- "#000000FF"  #Replace Mask elements corresponding to missing value locations of surface.matrix
+  df_1$x3p[[i]]$mask[which(is.na(df_1$x3p[[i]]$surface.matrix) & df_1$x3p[[i]]$mask == "#CD7F32FF")] <- "#000000FF"  #Replace Mask elements corresponding to missing value locations of surface.matrix
   df_1$x3p[[i]]$mask <- t(df_1$x3p[[i]]$mask) #Tranpose mask back to orginal 
 }
 
@@ -118,7 +122,7 @@ for(i in 1:nrow(df_1)){
 for(i in 1:nrow(df_2)){
   df_2$x3p[[i]] <- x3p_add_annotation(df_2$x3p[[i]], color = "#000000FF", annotation = "Missing Value")
   df_2$x3p[[i]]$mask <- t(df_2$x3p[[i]]$mask)
-  df_2$x3p[[i]]$mask[which(is.na(df_2$x3p[[i]]$surface.matrix))] <- "#000000FF"
+  df_2$x3p[[i]]$mask[which(is.na(df_2$x3p[[i]]$surface.matrix) & df_2$x3p[[i]]$mask == "#CD7F32FF")] <- "#000000FF"
   df_2$x3p[[i]]$mask <- t(df_2$x3p[[i]]$mask)
 }
 
