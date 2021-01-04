@@ -1,0 +1,804 @@
+---
+title: "Marking Scans Project Data Preprocessing for Neural Networks"
+author: "Andrew Maloney"
+date: "12/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+#Required and optional pacakges
+
+library(tidyverse) #Required
+library(x3ptools)  #Required
+library(ggplot2)  #optional
+library(keras) #Required
+library(purrr) #Required
+library(reshape2) #Required
+library(abind) #Required
+library(tensorflow) #Optional
+
+#install_keras(tensorflow = "gpu")
+
+```
+
+### Annotation Key
+
+[1] "#cd7f32" - well expressed striae
+
+[2] "#1f376c" - Left Groove
+
+[3] "#00ff00" - Right Groove
+
+[4] "#ff0080" - Breakoff
+
+[5] "#ffffff" - Damage
+
+[6] "#66ffff" - No striations
+
+[7] "#ffff66" - Vertical Change in striations
+
+
+```{r}
+
+data_dir <- "/media/Raven/Masks/Completed/LAPD"
+
+
+df <- tibble(path = list.files(path = file.path(data_dir, "Megan"), 
+                               pattern = ".x3p", recursive = T, 
+                               full.names = T)) %>% mutate(x3p = map(path, read_x3p)) #Read in x3p objects from server and store in tibble data-style format
+
+
+```
+
+```{r}
+
+#Take first 100 x3p files or however many you want to process
+df_1 <- df # For 128x128 processing
+
+```
+
+```{r}
+
+df_2 <- df # For 256x256 processing
+
+```
+
+```{r}
+
+#Extract the min x3p and max x3p surface matrix values for rescaling purposes if needed
+
+for(i in 1:nrow(df_1)){
+  
+  df_1$x3pmin[[i]] <- min(df_1$x3p[[i]]$surface.matrix, na.rm = TRUE)
+  df_1$x3pmax[[i]] <- max(df_1$x3p[[i]]$surface.matrix, na.rm = TRUE)
+  #df_1$x3p[[i]]$surface.matrix <- (df_1$x3p[[i]]$surface.matrix - df_1$x3pmin[[i]])/(df_1$x3pmax[[i]] - df_1$x3pmin[[i]])*255
+  
+}
+
+# Commented Out line is for if the user chooses to rescale the values to [0,255]
+
+
+```
+
+```{r}
+
+for(i in 1:nrow(df_2)){
+  
+  df_2$x3pmin[[i]] <- min(df_2$x3p[[i]]$surface.matrix, na.rm = TRUE)
+  df_2$x3pmax[[i]] <- max(df_2$x3p[[i]]$surface.matrix, na.rm = TRUE)
+  #df_2$x3p[[i]]$surface.matrix <- (df_2$x3p[[i]]$surface.matrix - df_2$x3pmin[[i]])/(df_2$x3pmax[[i]] - df_2$x3pmin[[i]])*255
+  
+}
+
+```
+
+
+```{r}
+
+
+for(i in 1:nrow(df_1)){
+  
+  df_1$x3p[[i]]$mask <- as.matrix(df_1$x3p[[i]]$mask) # raster object to matrix object
+  df_1$x3p[[i]]$mask <- t(df_1$x3p[[i]]$mask) #Transpose mask so dimensions correspond to surface.matrix dimensions
+  df_1$x3p[[i]]$mask[is.na(df_1$x3p[[i]]$surface.matrix) & df_1$x3p[[i]]$mask == "#CD7F32FF"] <- "#000000FF" #Replace Mask elements corresponding to missing value locations of surface.matrix
+  df_1$x3p[[i]]$mask <- t(df_1$x3p[[i]]$mask) #Tranpose mask back to orginal 
+  df_1$x3p[[i]]$mask <- as.raster(df_1$x3p[[i]]$mask) #matrix object back to raster object
+  df_1$x3p[[i]] <- x3p_add_annotation(df_1$x3p[[i]], color = "#000000", annotation = "Missing Value") #Create new annotation and corresponding color code for Missing Values
+}
+
+
+
+```
+
+```{r}
+
+
+for(i in 1:nrow(df_2)){
+  
+  df_2$x3p[[i]]$mask <- as.matrix(df_2$x3p[[i]]$mask)
+  df_2$x3p[[i]]$mask <- t(df_2$x3p[[i]]$mask)
+  df_2$x3p[[i]]$mask[is.na(df_2$x3p[[i]]$surface.matrix) & df_2$x3p[[i]]$mask == "#CD7F32FF"] <- "#000000FF"
+  df_2$x3p[[i]]$mask <- t(df_2$x3p[[i]]$mask)
+  df_2$x3p[[i]]$mask <- as.raster(df_2$x3p[[i]]$mask)
+  df_2$x3p[[i]] <- x3p_add_annotation(df_2$x3p[[i]], color = "#000000", annotation = "Missing Value")
+}
+
+```
+
+
+```{r}
+
+#Version 1 of interpolation function for missing values
+# For 128x128 data
+
+
+for(i in 1:nrow(df_1)){
+  
+  pad_surf <- rbind(0, cbind(0, df_1$x3p[[i]]$surface.matrix, 0), 0) #Create temporary padded surface.matrix so window does not go out of bounds.
+                                                                     #Using zeros as padding does not affect the calculations       
+  
+  
+  for(j in 1:nrow(df_1$x3p[[i]]$surface.matrix)){
+    for(k in 1:ncol(df_1$x3p[[i]]$surface.matrix)){
+      
+      if(is.na(pad_surf[j,k]) & #Find NA values
+       #all(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]) %in% pad_surf) &
+       any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){ 
+                                                #Check if neighbor elements are NA or Not
+        
+        pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE)
+                                                         #Replace missing element's with average of missing element's neighbors
+                                    
+       } 
+      
+    }
+  } 
+  
+  pad_surfx <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))] # Remove pad
+  
+  pad_surfx[, ncol(pad_surfx) ] <- pad_surfx[, ncol(pad_surfx) - 1] #Fill lingering NA left due to pad 
+  pad_surfx[nrow(pad_surfx), ] <- pad_surfx[nrow(pad_surfx)-1, ]  #Fill lingering NAs left due to pad
+  
+  df_1$x3p[[i]]$surface.matrix <- pad_surfx #Replace current surface matrix with interpolated matrix
+}
+
+
+
+
+```
+
+```{r}
+
+#Version 1 of interpolation function for missing values
+#For 256x256 data
+
+
+for(i in 1:nrow(df_2)){
+  
+  pad_surf <- rbind(0, cbind(0, df$x3p[[i]]$surface.matrix, 0), 0)
+  #
+  
+  for(j in 1:nrow(df_2$x3p[[i]]$surface.matrix)){
+    for(k in 1:ncol(df_2$x3p[[i]]$surface.matrix)){
+      
+      if(is.na(pad_surf[j,k]) &
+       #all(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]) %in% pad_surf) &
+       any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){
+        
+        
+        pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE)
+        
+        
+       } 
+      
+    }
+  } 
+  
+  pad_surfx <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))]
+  
+  pad_surfx[, ncol(pad_surfx) ] <- pad_surfx[, ncol(pad_surfx) - 1]
+  pad_surfx[nrow(pad_surfx), ] <- pad_surfx[nrow(pad_surfx)-1, ]
+  
+  df_2$x3p[[i]]$surface.matrix <- pad_surfx
+}
+
+
+```
+
+
+```{r}
+
+# Crop the maximum number of 128x128 resolution x3p's from a single x3p 3d topographical scan
+# Will automatically adjust to 127x128 if not a perfect fit
+
+f = function(x, n){
+    x - 128*(1:n)
+  
+}
+
+
+
+
+for(i in 1:nrow(df_1)){
+  
+  
+  dimension_x <- dim(df_1$x3p[[i]]$surface.matrix)[1] #obtain dimension x
+  dimension_y <- dim(df_1$x3p[[i]]$surface.matrix)[2] #obtain dimension y
+  
+  division_x <- dim(df_1$x3p[[i]]$surface.matrix)[1] / 128 
+  division_y <- dim(df_1$x3p[[i]]$surface.matrix)[2] / 128
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0) 
+  grid_lengths_y <- c(f(dimension_y, division_y), 0) # Create so called grid lengths
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y) # Grid outline
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df_1$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df_1$x3p[[i]],
+                               width = 128,
+                               height = 128) # Creates the new cropped x3ps and store as a list
+  
+}
+
+```
+
+```{r}
+# Crop the maximum number of 256x256 resolution x3p's from a single x3p 3d topographical scan
+# Will automatically adjust to 255x256 if not a perfect fit
+f = function(x, n){
+    x - 256*(1:n)
+  
+}
+
+
+for(i in 1:nrow(df_2)){
+  
+  
+  dimension_x <- dim(df_2$x3p[[i]]$surface.matrix)[1] #obtain dimension x
+  dimension_y <- dim(df_2$x3p[[i]]$surface.matrix)[2] #obtain dimension y
+  
+  division_x <- dim(df_2$x3p[[i]]$surface.matrix)[1] / 256
+  division_y <- dim(df_2$x3p[[i]]$surface.matrix)[2] / 256
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0)
+  grid_lengths_y <- c(f(dimension_y, division_y), 0) # Create so called grid lengths
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y) # Grid outline
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df_2$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df_2$x3p[[i]],
+                               width = 256,
+                               height = 256) # Creates the new cropped x3ps and store as a list
+  
+}
+
+
+```
+
+```{r}
+
+# For easier data processing, process in batches
+
+df_1_0 <- df_1[1:20,]
+df_1_1 <- df_1[21:40,]
+df_1_2 <- df_1[41:60,]
+df_1_3 <- df_1[61:80,]
+df_1_4 <- df_1[81:100,]
+
+```
+
+```{r}
+
+# For easier data processing, process in batches
+
+df_2_0 <- df_2[1:20,]
+df_2_1 <- df_2[21:40,]
+df_2_2 <- df_2[41:60,]
+df_2_3 <- df_2[61:80,]
+df_2_4 <- df_2[81:100,]
+
+
+
+```
+
+````{r}
+# Extract annotation 
+# Extract majority annotation
+# Process in batches
+
+df_1_0 <- unnest(df_1_0, chop_storage)
+for(i in 1:nrow(df_1_0)){
+  
+  df_1_0$labels[[i]] <- unique(pluck(df_1_0$chop_storage[[i]], 6))  #store all annotations in a crop in a list
+  
+  df_1_0$label_chosen[[i]] <- data.frame(prop.table(table(df_1_0$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)} #Store the majority annotation for a crop
+  
+}
+
+
+
+#-------------------------------------------------------------------------------------------------------------#
+
+df_1_1 <- unnest(df_1_1, chop_storage)
+for(i in 1:nrow(df_1_1)){
+  
+  df_1_1$labels[[i]] <- unique(pluck(df_1_1$chop_storage[[i]], 6)) #store all annotations in a crop in a list
+  
+  df_1_1$label_chosen[[i]] <- data.frame(prop.table(table(df_1_1$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)} #Store the majority annotation for a crop
+  
+}
+
+
+#---------------------------------------------------------------------------------------------------------------#
+
+df_1_2 <- unnest(df_1_2, chop_storage)
+for(i in 1:nrow(df_1_2)){
+  
+  df_1_2$labels[[i]] <- unique(pluck(df_1_2$chop_storage[[i]], 6)) #store all annotations in a crop in a list
+  
+  df_1_2$label_chosen[[i]] <- data.frame(prop.table(table(df_1_2$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)} #Store the majority annotation for a crop
+  
+}
+
+
+#-------------------------------------------------------------------------------------------------------------#
+
+df_1_3 <- unnest(df_1_3, chop_storage)
+for(i in 1:nrow(df_1_3)){
+  
+  df_1_3$labels[[i]] <- unique(pluck(df_1_3$chop_storage[[i]], 6)) #store all annotations in a crop in a list
+  
+  df_1_3$label_chosen[[i]] <- data.frame(prop.table(table(df_1_3$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)} #Store the majority annotation for a crop
+  
+}
+
+
+#--------------------------------------------------------------------------------------------------------------#
+
+df_1_4 <- unnest(df_1_4, chop_storage)
+for(i in 1:nrow(df_1_4)){
+  
+  df_1_4$labels[[i]] <- unique(pluck(df_1_4$chop_storage[[i]], 6)) #store all annotations in a crop in a list
+  
+  df_1_4$label_chosen[[i]] <- data.frame(prop.table(table(df_1_4$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)} #Store the majority annotation for a crop
+  
+}
+
+```
+
+
+```{r}
+# Extract annotation 
+# Extract majority annotation
+# Process in batches
+
+df_2_0 <- unnest(df_2_0, chop_storage)
+for(i in 1:nrow(df_2_0)){
+  
+  df_2_0$labels[[i]] <- unique(pluck(df_2_0$chop_storage[[i]], 6))
+  
+  df_2_0$label_chosen[[i]] <- data.frame(prop.table(table(df_2_0$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)}
+  
+}
+
+#-------------------------------------------------------------------------------------------------------#
+
+df_2_1 <- unnest(df_2_1, chop_storage)
+for(i in 1:nrow(df_2_1)){
+  
+  df_2_1$labels[[i]] <- unique(pluck(df_2_1$chop_storage[[i]], 6))
+  
+  df_2_1$label_chosen[[i]] <- data.frame(prop.table(table(df_2_1$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)}
+  
+}
+
+#-----------------------------------------------------------------------------------------------------#
+
+df_2_2 <- unnest(df_2_2, chop_storage)
+for(i in 1:nrow(df_2_2)){
+  
+  df_2_2$labels[[i]] <- unique(pluck(df_2_2$chop_storage[[i]], 6)) 
+  
+  df_2_2$label_chosen[[i]] <- data.frame(prop.table(table(df_2_2$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)}
+  
+}
+
+#------------------------------------------------------------------------------------------------------#
+
+df_2_3 <- unnest(df_2_3, chop_storage)
+for(i in 1:nrow(df_2_3)){
+  
+  df_2_3$labels[[i]] <- unique(pluck(df_2_3$chop_storage[[i]], 6)) 
+  
+  df_2_3$label_chosen[[i]] <- data.frame(prop.table(table(df_2_3$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)}
+  
+}
+
+#------------------------------------------------------------------------------------------------------#
+
+df_2_4 <- unnest(df_2_4, chop_storage)
+for(i in 1:nrow(df_2_4)){
+  
+  df_2_4$labels[[i]] <- unique(pluck(df_2_4$chop_storage[[i]], 6)) 
+  
+  df_2_4$label_chosen[[i]] <- data.frame(prop.table(table(df_2_4$chop_storage[[i]]$mask))) %>%
+    filter(Freq > .80 | Freq == max(Freq)) %>% {as.character(.$Var1)}
+  
+}
+
+
+```
+
+```{r}
+
+# Create 5d tensor for 3d convolutional neural network
+# Create predictor variables for 3d convolutional neural network
+# 128x128
+
+df_1_0 <- df_1_0 %>% unnest(c(label_chosen))
+
+array_1_0 = list()
+for(i in 1:nrow(df_1_0)){
+  
+  array_1_0[[i]] <- array(c(df_1_0$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1, 1))
+  
+}
+array_1_0 <- do.call(abind, c(array_1_0, along = 0))
+
+
+
+df_1_0$label_chosen[df_1_0$label_chosen == "#CD7F32FF"] <- 0
+df_1_0$label_chosen[df_1_0$label_chosen == "#00FF00FF"] <- 1
+df_1_0$label_chosen[df_1_0$label_chosen == "#FFFF66FF"] <- 2
+df_1_0$label_chosen[df_1_0$label_chosen == "#66FFFFFF"] <- 3
+df_1_0$label_chosen[df_1_0$label_chosen == "#FFFFFFFF"] <- 4
+df_1_0$label_chosen[df_1_0$label_chosen == "#1F376CFF"] <- 1
+df_1_0$label_chosen[df_1_0$label_chosen == "#FF0080FF"] <- 5
+
+y_1_0 <- as.numeric(df_1_0$label_chosen)
+
+y_1_0 <- to_categorical(y_1_0)
+
+save(array_1_0, y_1_0, file = "train_1_0_noNA_R2.RData")  #This is for saving data, file names will change when changes are made
+
+rm(array_1_0, df_1_0)
+
+#--------------------------------------------------------------
+
+
+df_1_1 <- df_1_1 %>% unnest(c(label_chosen))
+
+array_1_1 = list()
+for(i in 1:nrow(df_1_1)){
+  
+  array_1_1[[i]] <- array(c(df_1_1$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1, 1))
+  
+}
+array_1_1 <- do.call(abind, c(array_1_1, along = 0))
+
+
+
+df_1_1$label_chosen[df_1_1$label_chosen == "#CD7F32FF"] <- 0
+df_1_1$label_chosen[df_1_1$label_chosen == "#00FF00FF"] <- 1
+df_1_1$label_chosen[df_1_1$label_chosen == "#FFFF66FF"] <- 2
+df_1_1$label_chosen[df_1_1$label_chosen == "#66FFFFFF"] <- 3
+df_1_1$label_chosen[df_1_1$label_chosen == "#FFFFFFFF"] <- 4
+df_1_1$label_chosen[df_1_1$label_chosen == "#1F376CFF"] <- 1
+df_1_1$label_chosen[df_1_1$label_chosen == "#FF0080FF"] <- 5
+
+y_1_1 <- as.numeric(df_1_1$label_chosen)
+
+y_1_1 <- to_categorical(y_1_1)
+
+save(array_1_1, y_1_1, file = "train_1_1_noNA_R2.RData") #This is for saving data, file names will change when changes are made
+
+rm(array_1_1, df_1_1)
+
+
+
+
+#-------------------------------------------------------
+
+df_1_2 <- df_1_2 %>% unnest(c(label_chosen))
+
+array_1_2 = list()
+for(i in 1:nrow(df_1_2)){
+  
+  array_1_2[[i]] <- array(c(df_1_2$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1, 1))
+  
+}
+array_1_2 <- do.call(abind, c(array_1_2, along = 0))
+
+
+
+df_1_2$label_chosen[df_1_2$label_chosen == "#CD7F32FF"] <- 0
+df_1_2$label_chosen[df_1_2$label_chosen == "#00FF00FF"] <- 1
+df_1_2$label_chosen[df_1_2$label_chosen == "#FFFF66FF"] <- 2
+df_1_2$label_chosen[df_1_2$label_chosen == "#66FFFFFF"] <- 3
+df_1_2$label_chosen[df_1_2$label_chosen == "#FFFFFFFF"] <- 4
+df_1_2$label_chosen[df_1_2$label_chosen == "#1F376CFF"] <- 1
+df_1_2$label_chosen[df_1_2$label_chosen == "#FF0080FF"] <- 5
+
+y_1_2 <- as.numeric(df_1_2$label_chosen)
+
+y_1_2 <- to_categorical(y_1_2)
+
+save(array_1_2, y_1_2, file = "train_1_2_noNA_RS.RData") #This is for saving data, file names will change when changes are made
+
+rm(array_1_2, df_1_2)
+
+
+#-----------------------------------------------------------------
+
+
+df_1_3 <- df_1_3 %>% unnest(c(label_chosen))
+
+array_1_3 = list()
+for(i in 1:nrow(df_1_3)){
+  
+  array_1_3[[i]] <- array(c(df_1_3$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1, 1))
+  
+}
+array_1_3 <- do.call(abind, c(array_1_3, along = 0))
+
+
+
+df_1_3$label_chosen[df_1_3$label_chosen == "#CD7F32FF"] <- 0
+df_1_3$label_chosen[df_1_3$label_chosen == "#00FF00FF"] <- 1
+df_1_3$label_chosen[df_1_3$label_chosen == "#FFFF66FF"] <- 2
+df_1_3$label_chosen[df_1_3$label_chosen == "#66FFFFFF"] <- 3
+df_1_3$label_chosen[df_1_3$label_chosen == "#FFFFFFFF"] <- 4
+df_1_3$label_chosen[df_1_3$label_chosen == "#1F376CFF"] <- 1
+df_1_3$label_chosen[df_1_3$label_chosen == "#FF0080FF"] <- 5
+
+y_1_3 <- as.numeric(df_1_3$label_chosen)
+
+y_1_3 <- to_categorical(y_1_3)
+
+save(array_1_3, y_1_3, file = "train_1_3_noNA.RData") #This is for saving data, file names will change when changes are made
+
+rm(array_1_3, df_1_3)
+
+#--------------------------------------------------------------
+
+df_1_4 <- df_1_4 %>% unnest(c(label_chosen))
+
+array_1_4 = list()
+for(i in 1:nrow(df_1_4)){
+  
+  array_1_4[[i]] <- array(c(df_1_4$chop_storage[[i]]$surface.matrix),
+                     dim = c(128, 128, 1, 1))
+  
+}
+array_1_4 <- do.call(abind, c(array_1_4, along = 0))
+
+
+
+df_1_4$label_chosen[df_1_4$label_chosen == "#CD7F32FF"] <- 0
+df_1_4$label_chosen[df_1_4$label_chosen == "#00FF00FF"] <- 1
+df_1_4$label_chosen[df_1_4$label_chosen == "#FFFF66FF"] <- 2
+df_1_4$label_chosen[df_1_4$label_chosen == "#66FFFFFF"] <- 3
+df_1_4$label_chosen[df_1_4$label_chosen == "#FFFFFFFF"] <- 4
+df_1_4$label_chosen[df_1_4$label_chosen == "#1F376CFF"] <- 1
+df_1_4$label_chosen[df_1_4$label_chosen == "#FF0080FF"] <- 5
+
+y_1_4 <- as.numeric(df_1_4$label_chosen)
+
+y_1_4 <- to_categorical(y_1_4)
+
+save(array_1_4, y_1_4, file = "train_1_4_noNA_R2.RData") #This is for saving data, file names will change when changes are made
+
+rm(array_1_4, df_1_4) 
+
+
+
+```
+
+```{r}
+
+# Create 5d tensor for 3d convolutional neural network
+# Create predictor variables for 3d convolutional neural network
+# 256x256
+
+#Note: labels can be replaced with labels_chosen, this is just for show.  More discussion is needed
+
+df_2_0 <- df_2_0 %>% unnest(c(labels))
+
+array_2_0 = list()
+for(i in 1:nrow(df_2_0)){
+  
+  array_2_0[[i]] <- array(c(df_2_0$chop_storage[[i]]$surface.matrix),
+                     dim = c(256, 256, 1, 1))
+  
+}
+array_2_0 <- do.call(abind, c(array_2_0, along = 0))
+
+
+
+df_2_0$labels[df_2_0$labels == "#CD7F32FF"] <- 0
+df_2_0$labels[df_2_0$labels == "#00FF00FF"] <- 1
+df_2_0$labels[df_2_0$labels == "#FFFF66FF"] <- 2
+df_2_0$labels[df_2_0$labels == "#66FFFFFF"] <- 3
+df_2_0$labels[df_2_0$labels == "#FFFFFFFF"] <- 4
+df_2_0$labels[df_2_0$labels == "#1F376CFF"] <- 1
+df_2_0$labels[df_2_0$labels == "#FF0080FF"] <- 5
+
+y_2_0 <- as.numeric(df_2_0$labels)
+
+y_2_0 <- to_categorical(y_2_0)
+
+save(array_2_0, y_2_0, file = "train_2_0.RData")
+
+
+rm(array_2_0, y_2_0, df_2_0)
+
+
+
+
+
+df_2_1 <- df_2_1 %>% unnest(c(labels))
+
+
+
+array_2_1 = list()
+for(i in 1:nrow(df_2_1)){
+  
+  array_2_1[[i]] <- array(c(df_2_1$chop_storage[[i]]$surface.matrix),
+                     dim = c(256, 256, 1, 1))
+  
+}
+array_2_1 <- do.call(abind, c(array_2_1, along = 0))
+
+
+
+df_2_1$labels[df_2_1$labels == "#CD7F32FF"] <- 0
+df_2_1$labels[df_2_1$labels == "#00FF00FF"] <- 1
+df_2_1$labels[df_2_1$labels == "#FFFF66FF"] <- 2
+df_2_1$labels[df_2_1$labels == "#66FFFFFF"] <- 3
+df_2_1$labels[df_2_1$labels == "#FFFFFFFF"] <- 4
+df_2_1$labels[df_2_1$labels == "#1F376CFF"] <- 1
+df_2_1$labels[df_2_1$labels == "#FF0080FF"] <- 5
+
+y_2_1 <- as.numeric(df_2_1$labels)
+
+y_2_1 <- to_categorical(y_2_1)
+
+
+save(array_2_1, y_2_1, file = "train_2_1.RData")
+rm(array_2_1, y_2_1, df_2_1)
+
+
+
+df_2_2 <- df_2_2 %>% unnest(c(labels))
+
+
+array_2_2 = list()
+for(i in 1:nrow(df_2_2)){
+  
+  array_2_2[[i]] <- array(c(df_2_2$chop_storage[[i]]$surface.matrix),
+                     dim = c(256, 256, 1, 1))
+  
+}
+array_2_2 <- do.call(abind, c(array_2_2, along = 0))
+
+
+
+df_2_2$labels[df_2_2$labels == "#CD7F32FF"] <- 0
+df_2_2$labels[df_2_2$labels == "#00FF00FF"] <- 1
+df_2_2$labels[df_2_2$labels == "#FFFF66FF"] <- 2
+df_2_2$labels[df_2_2$labels == "#66FFFFFF"] <- 3
+df_2_2$labels[df_2_2$labels == "#FFFFFFFF"] <- 4
+df_2_2$labels[df_2_2$labels == "#1F376CFF"] <- 1
+df_2_2$labels[df_2_2$labels == "#FF0080FF"] <- 5
+
+
+
+y_2_2 <- as.numeric(df_2_2$labels)
+
+y_2_2 <- to_categorical(y_2_2)
+
+save(array_2_2, y_2_2, file = "train_2_2.RData")
+
+rm(array_2_2, y_2_2, df_2_2)
+
+
+
+
+
+
+df_2_3 <- df_2_3 %>% unnest(c(labels))
+
+
+array_2_3 = list()
+for(i in 1:nrow(df_2_3)){
+  
+  array_2_3[[i]] <- array(c(df_2_3$chop_storage[[i]]$surface.matrix),
+                     dim = c(256, 256, 1, 1))
+  
+}
+
+
+array_2_3 <- do.call(abind, c(array_2_3, along = 0))
+
+
+
+df_2_3$labels[df_2_3$labels == "#CD7F32FF"] <- 0
+df_2_3$labels[df_2_3$labels == "#00FF00FF"] <- 1
+df_2_3$labels[df_2_3$labels == "#FFFF66FF"] <- 2
+df_2_3$labels[df_2_3$labels == "#66FFFFFF"] <- 3
+df_2_3$labels[df_2_3$labels == "#FFFFFFFF"] <- 4
+df_2_3$labels[df_2_3$labels == "#1F376CFF"] <- 1
+df_2_3$labels[df_2_3$labels == "#FF0080FF"] <- 5
+
+
+
+y_2_3 <- as.numeric(df_2_3$labels)
+
+y_2_3 <- to_categorical(y_2_3)
+
+save(array_2_3, y_2_3, file = "train_2_3.RData")
+
+rm(array_2_3, y_2_3, df_2_3)
+
+
+
+
+
+df_2_4 <- df_2_4 %>% unnest(c(labels))
+
+array_2_4 = list()
+for(i in 1:nrow(df_2_4)){
+  
+  array_2_4[[i]] <- array(c(df_2_4$chop_storage[[i]]$surface.matrix),
+                     dim = c(256, 256, 1, 1))
+  
+}
+array_2_4 <- do.call(abind, c(array_2_4, along = 0))
+
+
+
+df_2_4$labels[df_2_4$labels == "#CD7F32FF"] <- 0
+df_2_4$labels[df_2_4$labels == "#00FF00FF"] <- 1
+df_2_4$labels[df_2_4$labels == "#FFFF66FF"] <- 2
+df_2_4$labels[df_2_4$labels == "#66FFFFFF"] <- 3
+df_2_4$labels[df_2_4$labels == "#FFFFFFFF"] <- 4
+df_2_4$labels[df_2_4$labels == "#1F376CFF"] <- 1
+df_2_4$labels[df_2_4$labels == "#FF0080FF"] <- 5
+
+
+y_2_4 <- as.numeric(df_2_4$labels)
+
+y_2_4 <- to_categorical(y_2_4)
+
+save(array_2_4, y_2_4, file = "train_2_4.RData")
+
+rm(array_2_4, y_2_4, df_2_4)
+
+```
+
+
