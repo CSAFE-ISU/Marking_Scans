@@ -1,0 +1,319 @@
+---
+title: "Untitled"
+author: "Andrew Maloney"
+date: "1/16/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+ # Set Large Seed.  Seed must be set before loading keras & Tensorflow
+
+#Loading required libraries
+library(reticulate)
+library(tidyverse)
+library(abind)
+library(keras)
+library(tensorflow)
+#install_keras(tensorflow = "gpu") for use with CUDA
+
+use_backend("tensorflow")
+
+reticulate::py_config() #CUDA safety check
+reticulate::py_module_available("keras") #CUDA safety check
+
+
+```
+
+```{r}
+# Creating training and validation sets
+
+#Round 1
+array_1 <- array_1_0
+y_1 <- y_1_0
+
+array_2 <- array_1_1
+y_2 <- y_1_1
+
+array_3 <- array_1_2
+y_3 <- y_1_2
+
+array_4 <- array_1_3
+y_4 <- y_1_3
+
+array_5 <- array_1_4
+y_5 <- y_1_4
+
+#Round 2
+
+array_6 <- array_1_0
+y_6 <- y_1_0
+
+
+array_7 <- array_1_1
+y_7 <- y_1_1
+y_7 <- to_categorical(y_7)
+
+array_8 <- array_1_2
+y_8 <- y_1_2
+y_8 <- to_categorical(y_8)
+
+array_9 <- array_1_3
+y_9 <- y_1_3
+y_9 <- to_categorical(y_9)
+
+
+array_10 <- array_1_4
+y_10 <- y_1_4
+y_10 <- to_categorical(y_10)
+
+
+tensor_x <- abind(array_1,
+                  array_2, 
+                  array_3,
+                  array_4,
+                  array_5,
+                  array_6,
+                  array_7,
+                  array_8,along = 1) #bind arrays together to create explanatory data
+                                                   #each array was obtained from a cropped (x_resolution by y_resolution) 3d topographical LEA scan data
+
+predictor_y <- rbind(y_1,
+                     y_2,
+                     y_3,
+                     y_4,
+                     y_5,
+                     y_6,
+                     y_7,
+                     y_8)#bind vectors together to create predictor variables for explanatory data
+                                    #each vector was obtained from a best ratio of annotations from each cropped (x_resolution by y_resolution) 3d topographical LEA scan data
+
+
+validation_x <- abind(array_9,
+                      array_10, along = 1) #Create explanatory data for validation set
+
+validation_y <- rbind(y_9, y_10) #Create predictor variables for validation data
+
+
+
+
+```
+
+```{r}
+
+create_residual_3dCNN_V2 <- function(Learning_rate = 0.1, decay = 0.0001){
+  
+  k_clear_session()
+  tensorflow::tf$random$set_seed(777777)
+  
+  input <- layer_input(shape = c(128, 128, 1, 1))
+  
+  skip_1 <- input %>% #-----------------------------------------------------------------------------> First skip connection being usec
+    layer_conv_3d(filters = 32, kernel_size = c(7, 7, 1), strides = c(2, 2, 1), padding = "same") %>% #Layer 2
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+      layer_max_pooling_3d(pool_size = c(2, 2, 1))
+  
+  output_1 <- skip_1 %>%
+    layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% #Layer 2
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% #Layer 3
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output_2 <- layer_add(list(output_1, skip_1)) %>%
+    layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same")%>% #Layer 4
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 5
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output_3 <- layer_add(list(output_2, output_1)) %>%
+    layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same")%>% # Layer 6
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 7
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output_4 <- layer_add(list(output_3, output_2)) %>%
+    layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(2, 2, 1), padding = "same") %>% # Layer 8
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # layer 9
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  skip_2 <- output_3 %>% #-----------------------------------------------------------------------------> feature_maps differ,so we perform a projection using 1x1 convolution
+    layer_conv_3d(filters = 64, kernel_size = 1, strides = c(2,2,1), padding = "same") %>% # Layer 10
+    layer_batch_normalization(center = TRUE, scale = TRUE) 
+
+  
+  output_5 <- layer_add(list(output_4, skip_2)) %>%
+    layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 11
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 12
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output_6 <- layer_add(list(output_5, output_4)) %>%
+    layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 13
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 14
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output_7 <- layer_add(list(output_6, output_5)) %>%
+    layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 15
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 16
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output_8 <- layer_add(list(output_7, output_6)) %>%
+    layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(2, 2, 1), padding = "same") %>% # Layer 17
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 18
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  skip_3 <- output_7 %>% #-----------------------------------------------------------------------------> feature_maps differ,so we perform a projection using 1x1 convolution
+    layer_conv_3d(filters = 128, kernel_size = 1, strides = c(2, 2, 1), padding = "same") %>% # Layer 19
+    layer_batch_normalization(center = TRUE, scale = TRUE)
+  
+  output_9 <- layer_add(list(output_8, skip_3)) %>%
+    layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 20
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 21
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output_10 <- layer_add(list(output_9, output_8)) %>%
+    layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 22
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 23
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output_11 <- layer_add(list(output_10, output_9)) %>%
+    layer_conv_3d(filters = 256, kernel_size = c(3, 3, 1), strides = c(2, 2, 1), padding = "same") %>% # Layer 24
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 256, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 25
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  skip_4 <- output_10 %>%
+    layer_conv_3d(filters = 256, kernel_size = 1, strides = c(2, 2, 1), padding = "same") %>% # Layer 26
+    layer_batch_normalization(center = TRUE, scale = TRUE)
+  
+  output_12 <- layer_add(list(output_11, skip_4)) %>%
+    layer_conv_3d(filters = 256, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 27
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu") %>%
+    layer_conv_3d(filters = 256, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 28
+      layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+      layer_activation("relu")
+  
+  output <- output_12 %>%
+    layer_global_average_pooling_3d() %>%
+    layer_flatten() %>%
+    layer_dense(units = 512) %>% #Layer 29
+    layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    layer_activation("relu") %>%
+    layer_dense(units = 6, activation = "softmax") # Layer 30
+  
+  
+  
+  cnn_resNet_30 <- keras_model(input, output)
+  
+  cnn_resNet_30 %>% compile(loss = "categorical_crossentropy",
+                        optimizer = optimizer_rmsprop(lr = Learning_rate, decay = decay),
+                        metrics = "accuracy")
+  
+  return(cnn_resNet_30)
+    
+  
+}
+
+
+```
+
+
+```{r}
+
+
+
+
+callback_log_acc_low <- LogMetrics$new()
+
+cnn_modelx <- create_residual_3dCNN_V2()
+
+cnn_modelx %>% fit(
+                    tensor_x, predictor_y, 
+                    batch_size = 100,
+                    epochs = 100,
+                    validation_data = list(validation_x, validation_y),
+                    shuffle = TRUE,
+                    #class_weight = list("0" = class_0, "1" = class_1, "2" = class_2, "3" = class_3, "4" = class_4, "5" = class_5),
+                    callbacks = list(callback_tensorboard(log_dir = "logs/run_resnet_3",histogram_freq = 1),   
+                                     callback_model_checkpoint(filepath = "my_model_cnn_resnet_3.h5", monitor = "val_accuracy",save_best_only = TRUE),
+                                     callback_reduce_lr_on_plateau(monitor = "val_loss", factor = 0.1)),verbose = 2)
+
+
+
+
+
+
+
+
+
+
+
+```
+
+
+
+```{r}
+
+
+categ <- c("Striations", "Grooves", "Vertical_Striae", "No_Striae", "Damage", "Breakoff")
+cnn_test <- load_model_hdf5("my_model_cnn_resnet.h5")
+
+
+classes_pred_test <- cnn_test$predict(validation_x)
+classes_pred_test <- categ[as.vector(classes_pred_test)+1]
+classes_test <- categ[apply(validation_y, 1, which.max)]
+table(classes_pred_test, classes_test)
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
