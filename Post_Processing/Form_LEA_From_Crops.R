@@ -1,6 +1,3 @@
-library(Thermimage)
-
-
 df <- df %>% unnest(c(original_indexes, chop_storage))
 
 bm <- df %>% select(Var1, Var2, chop_storage)
@@ -20,11 +17,23 @@ bm <- bm %>%
   summarise(matrix_list = list(surface),
             raster_list = list(mask))
 
+
+
+rotate_mask_matrix = function(maskM){
+  as.raster(apply(t(as.matrix(maskM)), 2, rev))
+  
+}
+
+rotate_mask_matrix_2 = function(maskM){
+  as.raster(apply(as.matrix(maskM), 2, rev))
+  
+}
+
 for(i in 1:nrow(bm)){
   
   bm$matrix_list_2[[i]] <- do.call(rbind, bm$matrix_list[[i]])
-  #bm$raster_list[[i]] <- lapply(bm$raster_list[[i]], rotate90.matrix)
-  #bm$raster_list[[i]] <- lapply(bm$raster_list[[i]], as.raster)
+  #bm$raster_list[[i]] <- lapply(bm$raster_list[[i]], rotate_mask_matrix)
+  #bm$raster_list[[i]] <- lapply(bm$raster_list[[i]], rotate_mask_matrix)
   bm$raster_list_2[[i]] <- do.call(cbind, bm$raster_list[[i]])
   
 }
@@ -33,10 +42,17 @@ for(i in 1:nrow(bm)){
 bm_final <- bm$matrix_list_2
 bm_final_2 <- bm$raster_list_2
 
-bm_final <- lapply(bm_final, rotate180.matrix)
-bm_final_2 <- lapply(bm_final_2, rotate180.matrix)
+rotate = function(M){
+  t(apply(M, 2, rev))
+}
 
-matrix <- do.call(cbind, bm_final)
+
+bm_final <- lapply(bm_final, rotate)
+bm_final <- lapply(bm_final, rotate)
+bm_final_2 <- lapply(bm_final_2, rotate)
+bm_final_2 <- lapply(bm_final_2, rotate)
+
+matrix <- do.call(cbind, bm_final) 
 raster <- do.call(rbind, bm_final_2)
 
 
