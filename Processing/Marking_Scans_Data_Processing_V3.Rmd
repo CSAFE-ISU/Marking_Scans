@@ -1,0 +1,322 @@
+---
+title: "Marking_Scans_Data_Processing_V3"
+author: "Andrew Maloney"
+date: "4/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+#Required and optional pacakges
+
+library(tidyverse) #Required
+library(x3ptools)  #Required
+library(ggplot2)  #optional
+library(keras) #Required
+library(purrr) #Required
+library(reshape2) #Required
+library(abind) #Required
+library(tensorflow) #Optional
+
+#install_keras(tensorflow = "gpu")
+
+```
+
+```{r}
+
+data_dir <- "/media/Raven/Masks/Completed/LAPD"
+
+
+df <- tibble(path = list.files(path = file.path(data_dir, "Megan"), #file path for scanner
+                               pattern = ".x3p", recursive = T, 
+                               full.names = T)) %>% mutate(x3p = map(path, read_x3p)) #Read in x3p objects from server and store in tibble data-style format
+
+```
+
+```{r}
+
+#Extract the min x3p and max x3p surface matrix values for rescaling purposes if needed
+#Specifications: 
+# df, a dataframe containing a x3p object
+# "minimun" will obtain the minimum value for a x3p surface matrix
+# "maximum" will obtain the maximum value for a x3p surface matrix
+# "both" will obtain the minimum and maximum values for a x3p surface matrix
+# "rescale" will obtain the minimun and maximum values for a x3p surface matrix as well as rescaling the surface matrix to [0, 255]
+
+
+x3p_surface_to_image <- function(df, obtain = c("minimum", "maximum", "both", "rescale"), value){
+  
+  if(obtain == "minimum"){
+    for(i in 1:nrow(df)){
+      df$x3pmin[[i]] <- min(df$x3p[[i]]$surface.matrix, na.rm = TRUE)
+    }
+    
+  } else if(obtain == "maximum"){
+    for(i in 1:nrow(df)){
+      df$x3pmax[[i]] <- max(df$x3p[[i]]$surface.matrix, na.rm = TRUE)
+    }
+    
+  } else if(obtain == "both"){
+    for(i in 1:nrow(df)){
+     df$x3pmin[[i]] <- min(df$x3p[[i]]$surface.matrix, na.rm = TRUE)
+     df$x3pmax[[i]] <- max(df$x3p[[i]]$surface.matrix, na.rm = TRUE)
+    }
+    
+  } else if(obtain == "rescale"){
+    for(i in 1:nrow(df)){
+     df$x3pmin[[i]] <- min(df$x3p[[i]]$surface.matrix, na.rm = TRUE)
+     df$x3pmax[[i]] <- max(df$x3p[[i]]$surface.matrix, na.rm = TRUE)
+     df$x3p[[i]]$surface.matrix <- (df$x3p[[i]]$surface.matrix - df$x3pmin[[i]])/(df$x3pmax[[i]] - df$x3pmin[[i]])*value
+    }
+  }
+  
+  return(df)
+}
+
+
+
+```
+
+```{r}
+
+x3p_NA_raster_relabel <- function(df, mask_1, mask_2, color_new, annotation_new){
+  
+  for(i in 1:nrow(df)){
+  
+  df$x3p[[i]]$mask <- as.matrix(df$x3p[[i]]$mask) # raster object to matrix object
+  df$x3p[[i]]$mask <- t(df$x3p[[i]]$mask) #Transpose mask so dimensions correspond to surface.matrix dimensions
+  df$x3p[[i]]$mask[is.na(df$x3p[[i]]$surface.matrix) & df$x3p[[i]]$mask == mask_1] <- mask_2 #Replace Mask elements corresponding to missing value locations of surface.matrix
+  df$x3p[[i]]$mask <- t(df$x3p[[i]]$mask) #Tranpose mask back to orginal 
+  df$x3p[[i]]$mask <- as.raster(df$x3p[[i]]$mask) #matrix object back to raster object
+  df$x3p[[i]] <- x3p_add_annotation(df$x3p[[i]], color = color_new, annotation = annotation_new) #Create new annotation and corresponding color code for Missing Values
+  }
+  
+  return(df)
+  
+}
+
+test <- back
+
+test <- x3p_NA_raster_relabel(test, "#CD7F32FF", "#000000FF", "#000000", "Missing Value")
+
+
+
+```
+
+```{r}
+
+
+
+x3p_interpolate_NA <- function(df){
+  
+  pad_surf <- rbind(0, cbind(0, df$x3p[[i]]$surface.matrix, 0), 0) #Create temporary padded surface.matrix so window does not go out of bounds.
+                                                                     #Using zeros as padding does not affect the calculations       
+  
+  
+  for(j in 1:nrow(df$x3p[[i]]$surface.matrix)){
+    for(k in 1:ncol(df$x3p[[i]]$surface.matrix)){
+      
+      if(is.na(pad_surf[j,k]) & #Find NA values
+       #all(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]) %in% pad_surf) &
+       any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){ 
+                                                #Check if neighbor elements are NA or Not
+        
+        pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE)
+                                                         #Replace missing element's with average of missing element's neighbors
+                                    
+       } 
+      
+    }
+  } 
+  
+  pad_surfx <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))] # Remove pad
+  
+  pad_surfx[, ncol(pad_surfx) ] <- pad_surfx[, ncol(pad_surfx) - 1] #Fill lingering NA left due to pad 
+  pad_surfx[nrow(pad_surfx), ] <- pad_surfx[nrow(pad_surfx)-1, ]  #Fill lingering NAs left due to pad
+  
+  df$x3p[[i]]$surface.matrix <- pad_surfx #Replace current surface matrix with interpolated matrix
+  
+  return(df)
+  
+}
+
+
+#test <- x3p_interpolate_NA(test)
+
+
+```
+
+```{r}
+
+f = function(x, n){
+    x - 128*(1:n)
+  
+}
+
+x3p_crop_LEAs <- function(df, obtain_index = TRUE, value){
+  if(obtain_index == FALSE){
+    
+    for(i in 1:nrow(df)){
+  
+  
+  dimension_x <- dim(df$x3p[[i]]$surface.matrix)[1] #obtain dimension x
+  dimension_y <- dim(df$x3p[[i]]$surface.matrix)[2] #obtain dimension y
+  
+  division_x <- dim(df$x3p[[i]]$surface.matrix)[1] / value 
+  division_y <- dim(df$x3p[[i]]$surface.matrix)[2] / value
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0) 
+  grid_lengths_y <- c(f(dimension_y, division_y), 0) # Create so called grid lengths
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y) # Grid outline
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df$x3p[[i]],
+                               width = value,
+                               height = value) # Creates the new cropped x3ps and store as a list
+  
+    }
+  
+  } else{
+    
+    for(i in 1:nrow(df)){
+  
+  
+  dimension_x <- dim(df$x3p[[i]]$surface.matrix)[1] #obtain dimension x
+  dimension_y <- dim(df$x3p[[i]]$surface.matrix)[2] #obtain dimension y
+  
+  division_x <- dim(df$x3p[[i]]$surface.matrix)[1] / value 
+  division_y <- dim(df$x3p[[i]]$surface.matrix)[2] / value
+  
+  grid_lengths_x <- c(f(dimension_x, division_x), 0) 
+  grid_lengths_y <- c(f(dimension_y, division_y), 0) # Create so called grid lengths
+  
+  grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y) # Grid outline
+  
+  grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+  
+  df$original_indexes[[i]] <- grid_outline
+  
+  df$chop_storage[[i]] <- map2(.x = grid_outline$Var1 ,
+                               .y = grid_outline$Var2 ,
+                               .f = x3p_crop, x3p = df$x3p[[i]],
+                               width = value,
+                               height = value) # Creates the new cropped x3ps and store as a list
+  
+}
+    
+  }
+  
+  return(df)
+}
+
+
+#test <- x3p_crop_LEAs(test, obtain_index = TRUE, 128)
+
+
+```
+
+```{r}
+
+x3p_get_labels <- function(df, decision_ratio){
+  df <- unnest(df, chop_storage)
+  
+  for(i in 1:nrow(df)){
+  
+  df$labels[[i]] <- unique(pluck(df$chop_storage[[i]], 6))  #store all annotations in a crop in a list
+  
+  df$label_chosen[[i]] <- data.frame(prop.table(table(df$chop_storage[[i]]$mask))) %>%
+    filter(Freq > decision_ratio | Freq == max(Freq)) %>% {as.character(.$Var1)} #Store the majority annotation for a crop
+  
+  }
+  return(df)
+}
+
+
+#test <- x3p_get_labels(test, .80)
+
+```
+
+```{r}
+
+x3p_to_tensor <- function(df, dim1, dim2, dim3, dim4){
+  
+  array_storage = list()
+  
+  for(i in 1:nrow(df)){
+    
+    array_storage[[i]] <- array(c(df$chop_storage[[i]]$surface.matrix),
+                                dim = c(dim1, dim2, dim3, dim4))
+    
+  }
+  
+  array_storage <- do.call(abind, c(array_storage, along = 0))
+  
+  return(array_storage)
+  
+}
+
+
+#arrayx <- x3p_to_tensor(test, 128, 128, 1, 1)
+
+
+
+```
+
+```{r}
+
+x3p_labels_to_numeric <- function(df){
+  
+  result <- c()
+  
+  df$label_chosen[df$label_chosen == "#CD7F32FF"] <- 0
+  df$label_chosen[df$label_chosen == "#00FF00FF"] <- 1
+  df$label_chosen[df$label_chosen == "#FFFF66FF"] <- 2
+  df$label_chosen[df$label_chosen == "#66FFFFFF"] <- 3
+  df$label_chosen[df$label_chosen == "#FFFFFFFF"] <- 4
+  df$label_chosen[df$label_chosen == "#1F376CFF"] <- 1
+  df$label_chosen[df$label_chosen == "#FF0080FF"] <- 5
+  df$label_chosen[df$label_chosen == "#000000FF"] <- 6
+  
+  result <- as.numeric(df$label_chosen)
+
+  return(result)  
+}
+
+
+#y <- x3p_labels_to_numeric(test)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
