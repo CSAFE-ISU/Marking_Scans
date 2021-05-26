@@ -1,0 +1,696 @@
+---
+title: "Untitled"
+author: "Andrew Maloney"
+date: "5/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+
+
+x3p_raster_relabel_NA <- function(df, mask_1, mask_2, color_new, annotation_new, multiple = FALSE, select_col){
+  if(multiple == TRUE){
+    if(select_col %in% colnames(df)){
+      for(i in 1:nrow(df)){
+        possibleError <- tryCatch({
+          
+          df[[select_col]][[i]]$mask <- as.matrix(df[[select_col]][[i]]$mask)
+          df[[select_col]][[i]]$mask <- t(df[[select_col]][[i]]$mask)
+          df[[select_col]][[i]]$mask[is.na(df[[select_col]][[i]]$surface.matrix) & df[[select_col]][[i]]$mask == mask_1 ] <- mask_2
+          df[[select_col]][[i]]$mask <- t(df[[select_col]][[i]]$mask)
+          df[[select_col]][[i]]$mask <- as.raster(df[[select_col]][[i]]$mask)
+          df[[select_col]][[i]] <- x3ptools::x3p_add_annotation(df[[select_col]][[i]], color = color_new, annotation = annotation_new)
+          
+        },
+        error = function(e){
+          e
+          print(paste("Possible Error found at iteration number ", i, " Please investigate", "... moving to next iteration", sep = ""))
+        }
+        
+        )
+        
+        if(inherits(possibleError, "error")) next
+        
+      }
+    } else {stop("Error: column selected containing x3p object does not exist")}
+  } else if(multiple == FALSE){
+    
+    df$mask <- as.matrix(df$mask)
+    df$mask <- t(df$mask)
+    df$mask[is.na(df$surface.matrix) & df$mask == mask_1] <- mask_2
+    df$mask <- t(df$mask)
+    df$mask <- as.raster(df$mask)
+    df <- x3ptools::x3p_add_annotation(df, color = color_new, annotation = annotation_new)
+    
+  }
+  
+  return(df)
+}
+
+
+
+
+x3p_raster_relabel_boundary <- function(df, mask_1, mask_2, x1, x2, y1, y2, multiple = FALSE, select_col){
+  if(multiple == TRUE){
+    if(select_col %in% colnames(df)){
+      
+      for(i in 1:nrow(df)){
+        possibleError <- tryCatch({
+          
+          df[[select_col]][[i]]$mask <- as.matrix(df[[select_col]][[i]]$mask)
+          df[[select_col]][[i]]$mask <- t(df[[select_col]][[i]]$mask)
+          new_mask <- df[[select_col]][[i]]$mask
+          
+          for(j in c(x1:x2)){
+            for(k in c(y1:y2)){
+              
+              if(is.na(df[[select_col]][[i]]$surface.matrix[j,k]) & new_mask[j,k] == mask_1){
+                
+                new_mask[j,k] <- mask_2
+                
+              }
+              
+            }
+          }
+          
+          new_mask <- t(new_mask)
+          new_mask <- as.raster(new_mask)
+          df[[select_col]][[i]]$mask <- new_mask
+          
+        },
+        
+        error = function(e){
+          e
+          print(paste("Possible Error found at iteration number ", i, " Please investigate", "... moving to next iteration", sep = ""))
+          
+        }
+        
+        )
+        
+        if(inherits(possibleError, "error")) next
+        
+      }
+      
+    } else {stop("Error: column selected containing x3p object does not exist")}
+  } else if(multiple == FALSE){
+    
+    df$mask <- as.matrix(df$mask)
+    df$mask <- t(df$mask)
+    
+    for(j in c(x1:x2)){
+      for(k in c(y1:y2)){
+        if(is.na(df$surface.matrix[j,k]) & df$mask[j,k] == mask_1){
+          df$mask[j,k] <- mask_2
+        }
+      }
+      
+    }
+    
+    df$mask <- t(df$mask)
+    df$mask <- as.raster(df$mask)
+    
+    
+  }
+  
+  return(df)
+  
+}
+
+x3p_raster_relabel_replace <- function(df, mask_1, mask_2, multiple = FALSE, select_col){
+  if(multiple == TRUE){
+    if(select_col %in% names(df)){
+      for(i in 1:nrow(df)){
+        possibleError <- tryCatch({
+          
+          df[[select_col]][[i]]$mask <- as.matrix(df[[select_col]][[i]]$mask)
+          df[[select_col]][[i]]$mask <- t(df[[select_col]][[i]]$mask)
+          df[[select_col]][[i]]$mask[df[[select_col]][[i]]$mask == mask_1 ] <- mask_2
+          df[[select_col]][[i]]$mask <- t(df[[select_col]][[i]]$mask)
+          df[[select_col]][[i]]$mask <- as.raster(df[[select_col]][[i]]$mask)
+          
+        },
+        
+        error = function(e){
+          e
+          print(paste("Possible Error found at iteration number ", i, " Please investigate", "... moving to next iteration", sep = ""))
+        }
+        
+        )
+      }
+    } else {stop("Error: column selected containing x3p object does not exist")}
+  } else if(multiple == FALSE){
+    
+    df$mask <- as.matrix(df$mask)
+    df$mask <- t(df$mask)
+    df$mask[is.na(df$surface.matrix) & df$mask == mask_1] <- mask_2
+    df$mask <- t(df$mask)
+    df$mask <- as.raster(df$mask)
+    
+  }
+  
+  return(df)
+}
+
+x3p_interpolate_NA <- function(df, multiple = FALSE, select_col){
+  if(multiple == TRUE){
+    if(select_col %in% colnames(df)){
+      for(i in 1:nrow(df)){
+        possibleError <- tryCatch({
+          
+          pad_surf <- rbind(0, cbind(0, df[[select_col]][[i]]$surface.matrix, 0), 0)
+          
+          for(j in 1:nrow(df[[select_col]][[i]]$surface.matrix)){
+            for(k in 1:ncol(df[[select_col]][[i]]$surface.matrix)){
+              
+              if(is.na(pad_surf[j,k]) &
+                 
+                 any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){
+                
+                pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE)
+                
+              }
+              
+            }
+          }
+          
+          pad_surfx <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))]
+          pad_surfx[, ncol(pad_surfx) ] <- pad_surfx[, ncol(pad_surfx) - 1]
+          pad_surfx[nrow(pad_surfx), ] <- pad_surfx[nrow(pad_surfx)-1, ]
+          df[[select_col]][[i]]$surface.matrix <- pad_surfx
+          
+        },
+        
+        error = function(e){
+          e
+          print(paste("Possible Error found at iteration number ", i, " Please investigate", "... moving to next iteration", sep = ""))
+        }
+        
+        )
+        
+        if(inherits(possibleError, "error")) next
+        
+      }
+    } else {stop("Error: column selected containing x3p object does not exist")}
+  } else if(multiple == FALSE){
+    
+    pad_surf <- rbind(0, cbind(0, df$surface.matrix, 0), 0)
+    
+    for(j in 1:nrow(df$surface.matrix)){
+      for(k in 1:ncol(df$surface.matrix)){
+        
+        if(is.na(pad_surf[j,k]) &
+           
+           any(!is.na(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1])))){
+          
+          pad_surf[j,k] <- mean(c(pad_surf[j-1, k-1], pad_surf[j-1, k], pad_surf[j-1, k+1], pad_surf[j, k-1], pad_surf[j+1, k-1], pad_surf[j+1, k], pad_surf[j+1, k+1]), na.rm = TRUE)
+          
+        }
+        
+      }
+    }
+    
+    pad_surfx <- pad_surf[-c(min(seq(nrow(pad_surf))), max(seq(nrow(pad_surf)))), -c(min(seq(ncol(pad_surf))), max(seq(ncol(pad_surf))))]
+    pad_surfx[, ncol(pad_surfx) ] <- pad_surfx[, ncol(pad_surfx) - 1]
+    pad_surfx[nrow(pad_surfx), ] <- pad_surfx[nrow(pad_surfx)-1, ]
+    df$surface.matrix <- pad_surfx
+    
+  }
+  
+  return(df)
+  
+}
+
+x3p_crop_LEAs <- function(df, obtain_index = TRUE, value, multiple = FALSE, select_col){
+
+  Var1 <- NULL
+  Var2 <- NULL
+
+  f = function(x, n){
+    x - 128*(1:n)
+
+  }
+
+  if(multiple == TRUE){
+    if(select_col %in% colnames(df)){
+      if(obtain_index == FALSE){
+
+        for(i in 1:nrow(df)){
+
+
+      dimension_x <- dim(df[[select_col]][[i]]$surface.matrix)[1] #obtain dimension x
+      dimension_y <- dim(df[[select_col]][[i]]$surface.matrix)[2] #obtain dimension y
+
+      division_x <- dim(df[[select_col]][[i]]$surface.matrix)[1] / value
+      division_y <- dim(df[[select_col]][[i]]$surface.matrix)[2] / value
+
+      grid_lengths_x <- c(f(dimension_x, division_x), 0)
+      grid_lengths_y <- c(f(dimension_y, division_y), 0) # Create so called grid lengths
+
+      grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y) # Grid outline
+
+      grid_outline <- grid_outline %>% dplyr::filter(Var1 >= 0 & Var2 >= 0)
+
+      df$crop_storage[[i]] <- purrr::map2(.x = grid_outline$Var1 ,
+                                   .y = grid_outline$Var2 ,
+                                   .f = x3ptools::x3p_crop, x3p = df[[select_col]][[i]],
+                                   width = value,
+                                   height = value) # Creates the new cropped x3ps and store as a list
+
+    }
+
+  } else{
+
+    for(i in 1:nrow(df)){
+
+
+      dimension_x <- dim(df[[select_col]][[i]]$surface.matrix)[1] #obtain dimension x
+      dimension_y <- dim(df[[select_col]][[i]]$surface.matrix)[2] #obtain dimension y
+
+      division_x <- dim(df[[select_col]][[i]]$surface.matrix)[1] / value
+      division_y <- dim(df[[select_col]][[i]]$surface.matrix)[2] / value
+
+      grid_lengths_x <- c(f(dimension_x, division_x), 0)
+      grid_lengths_y <- c(f(dimension_y, division_y), 0) # Create so called grid lengths
+
+      grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y) # Grid outline
+
+      grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+
+      df$original_indexes[[i]] <- grid_outline
+
+      df$crop_storage[[i]] <- purrr::map2(.x = grid_outline$Var1 ,
+                                   .y = grid_outline$Var2 ,
+                                   .f = x3ptools::x3p_crop, x3p = df[[select_col]][[i]],
+                                   width = value,
+                                   height = value) # Creates the new cropped x3ps and store as a list
+
+    }
+
+  }
+
+
+  } else {stop("Error: column selected containing x3p object does not exist")}
+  } else if(multiple == FALSE){
+
+
+    dimension_x <- dim(df$surface.matrix)[1] #obtain dimension x
+    dimension_y <- dim(df$surface.matrix)[2] #obtain dimension y
+
+    division_x <- dim(df$surface.matrix)[1] / value
+    division_y <- dim(df$surface.matrix)[2] / value
+
+    grid_lengths_x <- c(f(dimension_x, division_x), 0)
+    grid_lengths_y <- c(f(dimension_y, division_y), 0) # Create so called grid lengths
+
+    grid_outline <- expand.grid(grid_lengths_x, grid_lengths_y) # Grid outline
+
+    grid_outline <- grid_outline %>% filter(Var1 >= 0 & Var2 >= 0)
+
+    index <- grid_outline
+
+    crop_storage <- purrr::map2(.x = grid_outline$Var1 ,
+                                 .y = grid_outline$Var2 ,
+                                 .f = x3ptools::x3p_crop, x3p = df,
+                                 width = value,
+                                 height = value)
+
+    crops <- list(index, crop_storage)
+
+
+
+    return(crops)
+  }
+
+  return(df)
+}
+
+
+x3p_get_labels <- function(df, decision_ratio, multiple = FALSE, select_col){
+
+  Freq <- NULL
+
+  if(multiple == TRUE){
+  if(select_col %in% colnames(df)){
+  df <- tidyr::unnest(df, select_col)
+
+  for(i in 1:nrow(df)){
+
+    df$labels[[i]] <- unique(purrr::pluck(df[[select_col]][[i]], 6))  #store all annotations in a crop in a list
+
+    df$label_chosen[[i]] <- data.frame(prop.table(table(df[[select_col]][[i]]$mask))) %>%
+      filter(Freq > decision_ratio | Freq == max(Freq)) %>% {as.character(.$Var1[1])} #Store the majority annotation for a crop
+
+      }
+    } else {stop("Error: column selected containing x3p object does not exist")}
+  } else if(multiple == FALSE){
+
+    labels <- unique(purrr::pluck(df, 6))
+
+    label_chosen <- c(prop.table(table(df$mask))) %>%
+      filter(Freq > decision_ratio | Freq == max(Freq)) %>% {as.character(.$Var1[1])}
+
+    label_info <- list(labels, label_chosen)
+
+    return(label_info)
+
+  }
+
+  return(df)
+}
+
+
+x3p_to_tensor <- function(df, array_dim, dim1, dim2, dim3, dim4, multiple = FALSE, select_col){
+  if(multiple == TRUE){
+    if(select_col %in% colnames(df)){
+      if(array_dim == 5){
+
+        array_storage = list()
+
+        for(i in 1:nrow(df)){
+
+          array_storage[[i]] <- array(c(df[[select_col]][[i]]$surface.matrix),
+                                      dim = c(dim1, dim2, dim3, dim4))
+
+        }
+
+      } else if(array_dim == 4){
+
+        array_storage = list()
+
+        for(i in 1:nrow(df)){
+
+          array_storage[[i]] <- array(c(df[[select_col]][[i]]$surface.matrix),
+                                      dim = c(dim1, dim2, dim3))
+
+        }
+
+      } else if(array_dim == 3){
+
+        array_storage = list()
+
+        for(i in 1:nrow(df)){
+
+          array_storage[[i]] <- array(c(df[[select_col]][[i]]$surface.matrix),
+                                      dim = c(dim1, dim2))
+
+        }
+
+      } else if(array_dim == 2){
+
+        array_storage = list()
+
+        for(i in 1:nrow(df)){
+
+          array_storage[[i]] <- array(c(df[[select_col]][[i]]$surface.matrix),
+                                      dim = c(dim1))
+
+        }
+
+      } else {stop("Error: tensor can only be of dimensions greater than or equal to 2 and less than or equal to 5")}
+    } else {stop("Error: column selected containing x3p object does not exist")}
+
+  } else if(multiple == FALSE){
+
+    if(array_dim == 4) return({array(c(df$surface.matrix), dim = c(dim1, dim2, dim3, dim4))})
+    if(array_dim == 3) return({array(c(df$surface.matrix), dim = c(dim1, dim2, dim3))})
+    if(array_dim == 2) return({array(c(df$surface.matrix), dim = c(dim1, dim2))})
+    if(array_dim == 1) return({array(c(df$surface.matrix), dim = c(dim1))})
+
+  }
+
+  array_storage <- do.call(abind::abind, c(array_storage, along = 0))
+
+  return(array_storage)
+
+}
+
+x3p_labels_to_numeric <- function(df){
+
+  result <- c()
+
+  df$label_chosen[df$label_chosen == "#CD7F32FF"] <- 0
+  df$label_chosen[df$label_chosen == "#00FF00FF"] <- 1
+  df$label_chosen[df$label_chosen == "#66FFFFFF"] <- 2
+  df$label_chosen[df$label_chosen == "#FFFFFFFF"] <- 3
+  df$label_chosen[df$label_chosen == "#1F376CFF"] <- 1
+  df$label_chosen[df$label_chosen == "#FF0080FF"] <- 4
+  df$label_chosen[df$label_chosen == "#000000FF"] <- 5
+
+  result <- as.numeric(df$label_chosen)
+
+  return(result)
+}
+
+create_residual_3dCNN <- function(Learning_rate = 0.1, decay = FALSE){
+
+  k_clear_session()
+  tensorflow::tf$random$set_seed(777777)
+
+  input <- keras::layer_input(shape = c(128, 128, 1, 1))
+
+  skip_1 <- input %>% #-----------------------------------------------------------------------------> First skip connection being usec
+    keras::layer_conv_3d(filters = 32, kernel_size = c(7, 7, 1), strides = c(2, 2, 1), padding = "same") %>% #Layer 2
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_max_pooling_3d(pool_size = c(2, 2, 1))
+
+  output_1 <- skip_1 %>%
+    keras::layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% #Layer 2
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% #Layer 3
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output_2 <- keras::layer_add(list(output_1, skip_1)) %>%
+    keras::layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same")%>% #Layer 4
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 5
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output_3 <- keras::layer_add(list(output_2, output_1)) %>%
+    keras::layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same")%>% # Layer 6
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 32, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 7
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output_4 <- keras::layer_add(list(output_3, output_2)) %>%
+    keras::layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(2, 2, 1), padding = "same") %>% # Layer 8
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # layer 9
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  skip_2 <- output_3 %>% #-----------------------------------------------------------------------------> feature_maps differ,so we perform a projection using 1x1 convolution
+    keras::layer_conv_3d(filters = 64, kernel_size = 1, strides = c(2,2,1), padding = "same") %>% # Layer 10
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE)
+
+
+  output_5 <- keras::layer_add(list(output_4, skip_2)) %>%
+    keras::layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 11
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 12
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output_6 <- keras::layer_add(list(output_5, output_4)) %>%
+    keras::layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 13
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 14
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output_7 <- keras::layer_add(list(output_6, output_5)) %>%
+    keras::layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 15
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 64, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 16
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output_8 <- keras::layer_add(list(output_7, output_6)) %>%
+    keras::layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(2, 2, 1), padding = "same") %>% # Layer 17
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 18
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  skip_3 <- output_7 %>% #-----------------------------------------------------------------------------> feature_maps differ,so we perform a projection using 1x1 convolution
+    keras::layer_conv_3d(filters = 128, kernel_size = 1, strides = c(2, 2, 1), padding = "same") %>% # Layer 19
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE)
+
+  output_9 <- keras::layer_add(list(output_8, skip_3)) %>%
+    keras::layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 20
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 21
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output_10 <- keras::layer_add(list(output_9, output_8)) %>%
+    keras::layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 22
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 128, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 23
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output_11 <- keras::layer_add(list(output_10, output_9)) %>%
+    keras::layer_conv_3d(filters = 256, kernel_size = c(3, 3, 1), strides = c(2, 2, 1), padding = "same") %>% # Layer 24
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 256, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 25
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  skip_4 <- output_10 %>%
+    keras::layer_conv_3d(filters = 256, kernel_size = 1, strides = c(2, 2, 1), padding = "same") %>% # Layer 26
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE)
+
+  output_12 <- keras::layer_add(list(output_11, skip_4)) %>%
+    keras::layer_conv_3d(filters = 256, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 27
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_conv_3d(filters = 256, kernel_size = c(3, 3, 1), strides = c(1, 1, 1), padding = "same") %>% # Layer 28
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu")
+
+  output <- output_12 %>%
+    keras::layer_global_average_pooling_3d() %>%
+    keras::layer_flatten() %>%
+    keras::layer_dense(units = 512) %>% #Layer 29
+    keras::layer_batch_normalization(center = TRUE, scale = TRUE) %>%
+    keras::layer_activation("relu") %>%
+    keras::layer_dense(units = 6, activation = "softmax") # Layer 30
+
+
+
+  cnn_resNet_30 <- keras::keras_model(input, output)
+
+  cnn_resNet_30 %>% keras::compile(loss = "categorical_crossentropy",
+                            optimizer = optimizer_rmsprop(lr = Learning_rate, decay = decay),
+                            metrics = "accuracy")
+
+  return(cnn_resNet_30)
+
+
+}
+
+```
+
+```{r}
+
+#Relabel x3p mask--------------------------------------------------------------------------------------------------------------------
+
+
+df <- x3p_raster_relabel_2(df, mask_1 = "#CD7F32FF", mask_2 = "#1F376CFF", x1 = 37, x2 = 280, y1 = 3, y2 = 855, multiple = TRUE, select_col = "x3p")
+#left Grooves
+
+#x3pxx <- x3p_raster_relabel_2(x3pxx, mask_1 = "#CD7F32FF", mask_2 = "#00FF00FF", x1 = 2024, x2 = 2433, y1 = 69, y2 = 655, multiple = FALSE)
+#right groove
+
+df <- x3p_raster_relabel_2(df, mask_1 = "#CD7F32FF", mask_2 = "#FF0080FF", x1 = 1578, x2 = 3169, y1 = 850, y2 = 1020, multiple = TRUE, select_col = "x3p")
+#breakoff
+
+
+df <- x3p_raster_relabel_2(df, mask_1 = "#CD7F32FF", mask_2 = "#FFFFFFFF", x1 = 281, x2 = 3200, y1 = 3, y2 = 800, multiple = TRUE, select_col = "x3p")
+#damage
+
+df <- x3p_raster_relabel(df,  mask_1 = "#CD7F32FF", mask_2 = "#000000FF", color_new = "#000000", annotation_new = "missing value", multiple = TRUE, select_col = "x3p")
+
+
+#Trim x3p lea objects 1st to remove borders containing >= 95% missing values-----------------------------------------------------------
+
+for(i in 1:nrow(df)){
+  df$x3p[[i]] <- x3p_trim_na(df$x3p[[i]], ratio = 0.95)
+}
+
+df <- x3p_interpolate_NA(df, multiple = TRUE, select_col = "x3p")
+
+```
+
+
+```{r}
+
+
+df <- x3p_raster_relabel_replace(df, mask_1 = "#FFFF66FF", mask_2 = "#CD7F32FF", multiple = TRUE, select_col = "x3p")
+
+
+df <- x3p_crop_LEAs(df, obtain_index = TRUE, value = 128, multiple = TRUE, select_col = "x3p")
+
+
+```
+
+
+```{r}
+
+
+df1 <- df[1:25,]
+df2 <- df[26:50,]
+df3 <- df[51:75,]
+df4 <- df[76:132,]
+
+```
+
+
+```{r}
+
+df1 <- x3p_get_labels(df1, decision_ratio = .80, multiple = TRUE, select_col = "crop_storage")
+df2 <- x3p_get_labels(df2, decision_ratio = .80, multiple = TRUE, select_col = "crop_storage")
+df3 <- x3p_get_labels(df3, decision_ratio = .80, multiple = TRUE, select_col = "crop_storage")
+df4 <- x3p_get_labels(df4, decision_ratio = .80, multiple = TRUE, select_col = "crop_storage")
+
+
+```
+
+
+```{r}
+
+```{r}
+
+df1 <- df1 %>% filter(label_chosen != "#000000FF")
+df2 <- df2 %>% filter(label_chosen != "#000000FF")
+df3 <- df3 %>% filter(label_chosen != "#000000FF")
+df4 <- df4 %>% filter(label_chosen != "#000000FF")
+
+```
+
+
+```{r}
+
+tensor1 <- x3p_to_tensor(df1, array_dim = 5, 128, 128, 1, 1, multiple = TRUE, select_col = "crop_storage")
+labels1 <- x3p_labels_to_numeric(df1)
+labels1 <- to_categorical(labels1)
+rm(df1)
+
+tensor2 <- x3p_to_tensor(df2, array_dim = 5, 128, 128, 1, 1, multiple = TRUE, select_col = "crop_storage")
+labels2 <- x3p_labels_to_numeric(df2)
+labels2 <- to_categorical(labels2)
+rm(df2)
+
+tensor3 <- x3p_to_tensor(df3, array_dim = 5, 128, 128, 1, 1, multiple = TRUE, select_col = "crop_storage")
+labels3 <- x3p_labels_to_numeric(df3)
+labels3 <- to_categorical(labels3)
+rm(df3)
+
+tensor4 <- x3p_to_tensor(df4, array_dim = 5, 128, 128, 1, 1, multiple = TRUE, select_col = "crop_storage")
+labels4 <- x3p_labels_to_numeric(df4)
+labels4 <- to_categorical(labels4)
+rm(df4)
+
+
+```
